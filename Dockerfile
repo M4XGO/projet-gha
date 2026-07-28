@@ -16,7 +16,8 @@ COPY app.py test_app.py ./
 RUN useradd \
     --create-home \
     --uid 10001 \
-    appuser
+    appuser \
+    && chown -R appuser:appuser /app
 
 USER appuser
 
