@@ -1,0 +1,89 @@
+
+on:
+  push:
+    branches:
+      - main
+
+  pull_request:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  IMAGE_NAME: tp9-app
+
+jobs:
+  test-build-run:
+    name: Tests, build et validation Docker
+
+    runs-on: ubuntu-24.04
+
+    timeout-minutes: 10
+
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v6
+
+      - name: Afficher les versions
+        run: |
+          docker version
+          docker buildx version
+
+      - name: Construire l'image Docker
+        run: |
+          docker build \
+            --tag "${IMAGE_NAME}:${GITHUB_SHA}" \
+            .
+
+      - name: Exécuter les tests unitaires
+        run: |
+          docker run \
+            --rm \
+            "${IMAGE_NAME}:${GITHUB_SHA}" \
+            pytest -q
+
+      - name: Démarrer le conteneur
+        run: |
+          docker run \
+            --detach \
+            --name tp9-app \
+            --publish 8080:5000 \
+            "${IMAGE_NAME}:${GITHUB_SHA}"
+
+      - name: Attendre que l'application soit disponible
+        run: |
+          for attempt in {1..15}; do
+            echo "Tentative ${attempt}/15"
+
+            if curl \
+              --fail \
+              --silent \
+              --show-error \
+              http://127.0.0.1:8080/health
+            then
+              echo
+              echo "Application disponible"
+              exit 0
+            fi
+
+            sleep 2
+          done
+
+          echo "La route /health ne répond pas correctement"
+          exit 1
+
+      - name: Afficher l'état des conteneurs
+        if: ${{ !cancelled() }}
+        run: docker ps -a
+
+      - name: Afficher les logs en cas d'échec
+        if: ${{ failure() }}
+        run: docker logs tp9-app || true
+
+      - name: Nettoyer les ressources
+        if: ${{ always() }}
+        run: docker rm -f tp9-app || true
