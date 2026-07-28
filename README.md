@@ -13,3 +13,6 @@ Création d'un Dockerfile
 
 # 4 
 Création du fichier `ci.yml` dans le folder `.github/workflows`
+
+# 5 
+Déclenchement de la CI et validation du fonctionnement
